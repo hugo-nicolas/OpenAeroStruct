@@ -47,6 +47,7 @@ class GetVectors(om.ExplicitComponent):
             name = surface["name"]
 
             ground_effect = surface.get("groundplane", False)
+            freesurface_effect = surface.get("freesurface", False)
 
             vectors_name = "{}_{}_vectors".format(name, eval_name)
 
@@ -60,6 +61,8 @@ class GetVectors(om.ExplicitComponent):
             else:
                 actual_ny_size = ny
             if ground_effect:
+                actual_nx_size = nx * 2
+            elif freesurface_effect:
                 actual_nx_size = nx * 2
             else:
                 actual_nx_size = nx
@@ -101,9 +104,16 @@ class GetVectors(om.ExplicitComponent):
             vectors_name = "{}_{}_vectors".format(name, eval_name)
 
             ground_effect = surface.get("groundplane", False)
+            freesurface_effect = surface.get("freesurface", False)
 
             mesh_reshaped = np.einsum("i,jkl->ijkl", np.ones(num_eval_points), inputs[mesh_name])
             if surface["symmetry"] and ground_effect:
+                eval_points_reshaped = np.einsum(
+                    "il,jk->ijkl",
+                    inputs[eval_name],
+                    np.ones((2 * nx, 2 * ny - 1)),
+                )
+            elif surface["symmetry"] and freesurface_effect:
                 eval_points_reshaped = np.einsum(
                     "il,jk->ijkl",
                     inputs[eval_name],

@@ -69,6 +69,7 @@ class AeroPoint(om.Group):
             if surface.get("groundplane", False):
                 ground_effect = True
 
+        # check for free surface and if so, promote
         freesurface_effect = False
         for surface in surfaces:
             if surface.get("freesurface", False):
