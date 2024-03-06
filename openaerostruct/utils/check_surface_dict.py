@@ -35,6 +35,7 @@ def check_surface_dict_keys(surface):
         "with_viscous",
         "with_wave",
         "groundplane",
+        "freesurface",
         "k_lam",
         "t_over_c_cp",
         "c_max_t",

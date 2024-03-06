@@ -11,7 +11,6 @@ from openaerostruct.aerodynamics.states import VLMStates
 from openaerostruct.aerodynamics.compressible_states import CompressibleVLMStates
 from openaerostruct.structures.tube_group import TubeGroup
 from openaerostruct.structures.wingbox_group import WingboxGroup
-from openaerostruct.utils.check_surface_dict import check_surface_dict_keys
 
 import openmdao.api as om
 
@@ -26,9 +25,6 @@ class AerostructGeometry(om.Group):
         surface = self.options["surface"]
         DVGeo = self.options["DVGeo"]
         connect_geom_DVs = self.options["connect_geom_DVs"]
-
-        # key validation of the surface dict
-        check_surface_dict_keys(surface)
 
         geom_promotes_in = []
         geom_promotes_out = ["mesh"]
@@ -161,6 +157,7 @@ class CoupledPerformance(om.Group):
                 "Mach_number",
                 "re",
                 "rho",
+                "height_agl",
                 "widths",
                 "lengths_spanwise",
                 "lengths",
@@ -285,6 +282,12 @@ class AerostructPoint(om.Group):
             if surface.get("groundplane", False):
                 ground_effect = True
 
+        # check for free-surface effect and if so, promote
+        freesurface_effect = False
+        for surface in surfaces:
+            if surface.get("freesurface", False):
+                freesurface_effect = True
+
         if self.options["compressible"] is True:
             aero_states = CompressibleVLMStates(surfaces=surfaces, rotational=rotational)
             prom_in = ["v", "alpha", "beta", "rho", "Mach_number"]
@@ -293,6 +296,9 @@ class AerostructPoint(om.Group):
             prom_in = ["v", "alpha", "beta", "rho"]
         if ground_effect:
             prom_in.append("height_agl")
+        elif freesurface_effect:
+            prom_in.append("height_agl")
+            prom_in.append("mu")
 
         # Add a single 'aero_states' component for the whole system within the
         # coupled group.
@@ -337,6 +343,9 @@ class AerostructPoint(om.Group):
             prom_in.append("Mach_number")
         if ground_effect:
             prom_in.append("height_agl")
+        elif freesurface_effect:
+            prom_in.append("height_agl")
+            prom_in.append("mu")
 
         # Add the coupled group to the model problem
         self.add_subsystem("coupled", coupled, promotes_inputs=prom_in)

@@ -42,7 +42,7 @@ class VLMGeometry(om.ExplicitComponent):
 
     def setup(self):
         self.surface = surface = self.options["surface"]
-
+        
         mesh = surface["mesh"]
         nx = self.nx = mesh.shape[0]
         ny = self.ny = mesh.shape[1]
@@ -184,7 +184,7 @@ class VLMGeometry(om.ExplicitComponent):
         nx = self.nx
         ny = self.ny
         mesh = inputs["def_mesh"]
-
+        
         # Compute the length of the quarter-chord line of each panels
         quarter_chord = 0.25 * mesh[-1] + 0.75 * mesh[0]
         lengths_spanwise = np.linalg.norm(quarter_chord[1:, :] - quarter_chord[:-1, :], axis=1)

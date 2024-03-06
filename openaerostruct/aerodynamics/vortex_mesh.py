@@ -1,4 +1,5 @@
 import numpy as np
+import matplotlib.pyplot as plt
 
 import openmdao.api as om
 
@@ -14,11 +15,14 @@ class VortexMesh(om.ExplicitComponent):
         That is, if we have both a wing and a tail surface, we will have both
         `wing_def_mesh` and `tail_def_mesh` as inputs.
     height_agl : scalar
-        If ground effect is turned on, this input defines the height above
-        the groud plane (defined from the origin 0,0,0)
+        If ground (resp. free-surface) effect is turned on, this input defines
+        the height above the ground (resp. free-surface) plane (defined from the origin 0,0,0).
     alpha : scalar
-        If ground effect is turned on, this input defines the angular
-        rotation of the ground plane
+        If ground effect is turned on, this input defines
+        the angular rotation of the ground plane around the y-axis.
+    mu : scalar
+        If free surface is turned on, this input defines
+        the angular rotation of the ground plane around the x-axis.
 
     Returns
     -------
@@ -42,6 +46,7 @@ class VortexMesh(om.ExplicitComponent):
         # by mirroring the symmetric mesh.
 
         any_ground_effect = False
+        any_freesurface_effect = False
 
         for surface in surfaces:
             mesh = surface["mesh"]
@@ -52,9 +57,12 @@ class VortexMesh(om.ExplicitComponent):
             mesh_name = "{}_def_mesh".format(name)
             vortex_mesh_name = "{}_vortex_mesh".format(name)
 
-            self.add_input(mesh_name, shape=(nx, ny, 3), units="m", tags=["mphys_coupling"])
+            self.add_input(
+                mesh_name, shape=(nx, ny, 3), units="m", tags=["mphys_coupling"]
+            )
 
             ground_effect = surface.get("groundplane", False)
+            freesurface_effect = surface.get("freesurface", False)
 
             if ground_effect:
                 if not any_ground_effect:
@@ -62,16 +70,44 @@ class VortexMesh(om.ExplicitComponent):
                     any_ground_effect = True
                     self._cached_constant_partial_vals = dict()
                     self.add_input("height_agl", val=8000.0, units="m")
-                    self.add_input("alpha", val=0.0 * np.pi / 180, units="rad", tags=["mphys_inputs"])
+                    self.add_input(
+                        "alpha",
+                        val=0.0 * np.pi / 180,
+                        units="rad",
+                        tags=["mphys_inputs"],
+                    )
+            elif freesurface_effect:
+                if not any_freesurface_effect:
+                    # only need to add the extra inputs once
+                    any_freesurface_effect = True
+                    self._cached_constant_partial_vals = dict()
+                    self.add_input("height_agl", val=8000.0, units="m")
+                    self.add_input(
+                        "mu",
+                        val=0.0 * np.pi / 180,
+                        units="rad",
+                        tags=["mphys_inputs"],
+                    )
+                    # we declare the partials here because the complex step is used for all (for the moment)
+                    self.declare_partials("*", "*", method="cs")
 
             if surface["symmetry"]:
-                left_wing = abs(surface["mesh"][0, 0, 1]) > abs(surface["mesh"][0, -1, 1])
+                left_wing = abs(surface["mesh"][0, 0, 1]) > abs(
+                    surface["mesh"][0, -1, 1]
+                )
+
                 if ground_effect:
-                    self.add_output(vortex_mesh_name, shape=(2 * nx, ny * 2 - 1, 3), units="m")
+                    self.add_output(
+                        vortex_mesh_name, shape=(2 * nx, ny * 2 - 1, 3), units="m"
+                    )
                     # these are cheaper to just do with CS
-                    self.declare_partials(vortex_mesh_name, ["alpha", "height_agl"], method="cs")
+                    self.declare_partials(
+                        vortex_mesh_name, ["alpha", "height_agl"], method="cs"
+                    )
                     mesh_indices = np.arange(nx * ny * 3).reshape((nx, ny, 3))
-                    vor_indices = np.arange(2 * nx * (2 * ny - 1) * 3).reshape((2 * nx, (2 * ny - 1), 3))
+                    vor_indices = np.arange(2 * nx * (2 * ny - 1) * 3).reshape(
+                        (2 * nx, (2 * ny - 1), 3)
+                    )
                     if not left_wing:
                         vor_indices = vor_indices[:, ::-1, :]
                         mesh_indices = mesh_indices[:, ::-1, :]
@@ -79,11 +115,32 @@ class VortexMesh(om.ExplicitComponent):
                     quadrant_2_indices = vor_indices[:nx, ny:, :]
                     quadrant_3_indices = vor_indices[nx:, :ny, :]
                     quadrant_4_indices = vor_indices[nx:, ny:, :]
-                else:
-                    # no groundplane
-                    self.add_output(vortex_mesh_name, shape=(nx, ny * 2 - 1, 3), units="m")
+
+                elif freesurface_effect:
+                    self.add_output(
+                        vortex_mesh_name, shape=(2 * nx, ny * 2 - 1, 3), units="m"
+                    )
                     mesh_indices = np.arange(nx * ny * 3).reshape((nx, ny, 3))
-                    vor_indices = np.arange(nx * (2 * ny - 1) * 3).reshape((nx, (2 * ny - 1), 3))
+                    vor_indices = np.arange(2 * nx * (2 * ny - 1) * 3).reshape(
+                        (2 * nx, (2 * ny - 1), 3)
+                    )
+                    if not left_wing:
+                        vor_indices = vor_indices[:, ::-1, :]
+                        mesh_indices = mesh_indices[:, ::-1, :]
+                    quadrant_1_indices = vor_indices[:nx, :ny, :]
+                    quadrant_2_indices = vor_indices[:nx, ny:, :]
+                    quadrant_3_indices = vor_indices[nx:, :ny, :]
+                    quadrant_4_indices = vor_indices[nx:, ny:, :]
+
+                else:
+                    # no groundplane or free surface
+                    self.add_output(
+                        vortex_mesh_name, shape=(nx, ny * 2 - 1, 3), units="m"
+                    )
+                    mesh_indices = np.arange(nx * ny * 3).reshape((nx, ny, 3))
+                    vor_indices = np.arange(nx * (2 * ny - 1) * 3).reshape(
+                        (nx, (2 * ny - 1), 3)
+                    )
                     if not left_wing:
                         vor_indices = vor_indices[:, ::-1, :]
                         mesh_indices = mesh_indices[:, ::-1, :]
@@ -112,7 +169,9 @@ class VortexMesh(om.ExplicitComponent):
                 # quadrant 2 is the reflection of the baseline across the midline
                 # need to build these piecewise xyz because of the midline reflection
                 for dim3 in range(3):
-                    rows = np.hstack((rows, np.tile(quadrant_2_indices[:-1, :, dim3].flatten(), 2)))
+                    rows = np.hstack(
+                        (rows, np.tile(quadrant_2_indices[:-1, :, dim3].flatten(), 2))
+                    )
                     rows = np.hstack((rows, quadrant_2_indices[-1, :, dim3].flatten()))
                     cols = np.concatenate(
                         [
@@ -139,6 +198,7 @@ class VortexMesh(om.ExplicitComponent):
                 )
 
                 if ground_effect:
+                    self.declare_partials(vortex_mesh_name, mesh_name, method="cs")
                     # these reflections (across the groundplane) are more complex because of the alpha rotation
                     # which means that the x and z points of the reflected mesh depend on BOTH the x and z points of the initial mesh
                     # y only depends on y as usual
@@ -146,8 +206,17 @@ class VortexMesh(om.ExplicitComponent):
                     # third quadrant dependencies (x on x, y on y, z on z, x on z, z on x)
                     list_of_deps = [(0, 0), (1, 1), (2, 2), (0, 2), (2, 0)]
                     for dep_of, dep_on in list_of_deps:
-                        rows = np.hstack((rows, np.tile(quadrant_3_indices[:-1, :, dep_of].flatten(), 2)))
-                        rows = np.hstack((rows, quadrant_3_indices[-1, :, dep_of].flatten()))
+                        rows = np.hstack(
+                            (
+                                rows,
+                                np.tile(
+                                    quadrant_3_indices[:-1, :, dep_of].flatten(), 2
+                                ),
+                            )
+                        )
+                        rows = np.hstack(
+                            (rows, quadrant_3_indices[-1, :, dep_of].flatten())
+                        )
                         cols = np.concatenate(
                             [
                                 cols,
@@ -159,8 +228,17 @@ class VortexMesh(om.ExplicitComponent):
 
                     # fourth quadrant dependencies (x on x, y on y, z on z, x on z, z on x)
                     for dep_of, dep_on in list_of_deps:
-                        rows = np.hstack((rows, np.tile(quadrant_4_indices[:-1, :, dep_of].flatten(), 2)))
-                        rows = np.hstack((rows, quadrant_4_indices[-1, :, dep_of].flatten()))
+                        rows = np.hstack(
+                            (
+                                rows,
+                                np.tile(
+                                    quadrant_4_indices[:-1, :, dep_of].flatten(), 2
+                                ),
+                            )
+                        )
+                        rows = np.hstack(
+                            (rows, quadrant_4_indices[-1, :, dep_of].flatten())
+                        )
                         cols = np.concatenate(
                             [
                                 cols,
@@ -171,16 +249,76 @@ class VortexMesh(om.ExplicitComponent):
                         )
 
                     # can't declare constant partials because these depend on alpha (and h?)
-                    self.declare_partials(vortex_mesh_name, mesh_name, rows=rows, cols=cols)
+                    self.declare_partials(
+                        vortex_mesh_name, mesh_name, rows=rows, cols=cols
+                    )
                     self._cached_constant_partial_vals[name] = data.copy()
 
+                elif freesurface_effect:
+                    # these reflections (across the free surface) are more complex because of the mu rotation
+                    # which means that the y and z points of the reflected mesh depend on BOTH the y and z points of the initial mesh
+                    # x only depends on x as usual
+
+                    # third quadrant dependencies (x on x, y on y, z on z, y on z, z on y)
+                    list_of_deps = [(0, 0), (1, 1), (2, 2), (1, 2), (2, 1)]
+                    for dep_of, dep_on in list_of_deps:
+                        rows = np.hstack(
+                            (
+                                rows,
+                                np.tile(
+                                    quadrant_3_indices[:-1, :, dep_of].flatten(), 2
+                                ),
+                            )
+                        )
+                        rows = np.hstack(
+                            (rows, quadrant_3_indices[-1, :, dep_of].flatten())
+                        )
+                        cols = np.concatenate(
+                            [
+                                cols,
+                                mesh_indices[:-1, :, dep_on].flatten(),
+                                mesh_indices[1:, :, dep_on].flatten(),
+                                mesh_indices[-1, :, dep_on].flatten(),
+                            ]
+                        )
+
+                    # fourth quadrant dependencies (x on x, y on y, z on z, x on z, z on x)
+                    for dep_of, dep_on in list_of_deps:
+                        rows = np.hstack(
+                            (
+                                rows,
+                                np.tile(
+                                    quadrant_4_indices[:-1, :, dep_of].flatten(), 2
+                                ),
+                            )
+                        )
+                        rows = np.hstack(
+                            (rows, quadrant_4_indices[-1, :, dep_of].flatten())
+                        )
+                        cols = np.concatenate(
+                            [
+                                cols,
+                                mesh_indices[:-1, :-1, dep_on][:, ::-1].flatten(),
+                                mesh_indices[1:, :-1, dep_on][:, ::-1].flatten(),
+                                mesh_indices[-1, :-1, dep_on][::-1].flatten(),
+                            ]
+                        )
+
                 else:
-                    # no groundplane, constant partial values
-                    self.declare_partials(vortex_mesh_name, mesh_name, val=data, rows=rows, cols=cols)
+                    # no groundplane or free surface, constant partial values
+                    self.declare_partials(
+                        vortex_mesh_name, mesh_name, val=data, rows=rows, cols=cols
+                    )
 
             else:
                 if ground_effect:
-                    raise ValueError("Ground effect is not supported without symmetry turned on")
+                    raise ValueError(
+                        "Ground effect is not supported without symmetry turned on"
+                    )
+                elif freesurface_effect:
+                    raise ValueError(
+                        "Free-surface effect is not supported without symmetry turned on"
+                    )
 
                 self.add_output(vortex_mesh_name, shape=(nx, ny, 3), units="m")
 
@@ -204,7 +342,9 @@ class VortexMesh(om.ExplicitComponent):
                     ]
                 )
 
-                self.declare_partials(vortex_mesh_name, mesh_name, val=data, rows=rows, cols=cols)
+                self.declare_partials(
+                    vortex_mesh_name, mesh_name, val=data, rows=rows, cols=cols
+                )
 
     def compute(self, inputs, outputs):
         surfaces = self.options["surfaces"]
@@ -214,13 +354,119 @@ class VortexMesh(om.ExplicitComponent):
             ny = surface["mesh"].shape[1]
             name = surface["name"]
             ground_effect = surface.get("groundplane", False)
+            freesurface_effect = surface.get("freesurface", False)
             left_wing = abs(surface["mesh"][0, 0, 1]) > abs(surface["mesh"][0, -1, 1])
 
             mesh_name = "{}_def_mesh".format(name)
             vortex_mesh_name = "{}_vortex_mesh".format(name)
-            if not ground_effect:
+
+            if ground_effect:
+                # symmetric in y plus ground plane using the first dimension
+                mesh = np.zeros(
+                    (2 * nx, ny * 2 - 1, 3), dtype=type(inputs[mesh_name][0, 0, 0])
+                )
+
+                if left_wing:
+                    mesh[:nx, :ny, :] = inputs[mesh_name]
+                    # indices are numbered from tip to centerline
+                    #  reflection is all but midpoint in rev order
+                    mesh[:nx, ny:, :] = inputs[mesh_name][:, :-1, :][:, ::-1, :]
+                    mesh[:nx, ny:, 1] *= -1.0
+                else:
+                    mesh[:nx, ny - 1 :, :] = inputs[mesh_name]
+                    # indices are numbered from centerline to tip
+                    #  reflection is all points in rev order
+                    mesh[:nx, : ny - 1, :] = inputs[mesh_name][:, 1:, :][:, ::-1, :]
+                    mesh[:nx, : ny - 1, 1] *= -1.0
+
+                alpha = inputs["alpha"][0]
+                plane_normal = np.array([np.sin(alpha), 0.0, -np.cos(alpha)]).reshape(
+                    (1, 1, 3)
+                )
+                plane_point = np.zeros((1, 1, 3)) + plane_normal * inputs["height_agl"]
+
+                # reflect about the ground plane
+                # plane is defined parallel to the free stream and height_agl from the origin 0 0 0
+                v = mesh[:nx, :, :] - plane_point
+                temp = np.inner(v, plane_normal).squeeze()[:, :, np.newaxis]
+                v_par = temp * plane_normal
+                mesh[nx:, :, :] = mesh[:nx, :, :] - 2 * v_par
+
+                outputs[vortex_mesh_name][: nx - 1, :, :] = (
+                    0.75 * mesh[: nx - 1, :, :] + 0.25 * mesh[1:nx, :, :]
+                )
+                outputs[vortex_mesh_name][nx - 1, :, :] = mesh[nx - 1, :, :]
+                outputs[vortex_mesh_name][nx:-1, :, :] = (
+                    0.75 * mesh[nx:-1, :, :] + 0.25 * mesh[nx + 1 :, :, :]
+                )
+                outputs[vortex_mesh_name][-1, :, :] = mesh[-1, :, :]
+
+            elif freesurface_effect:
+                # symmetric in y plus ground plane using the first dimension
+                mesh = np.zeros(
+                    (2 * nx, ny * 2 - 1, 3), dtype=type(inputs[mesh_name][0, 0, 0])
+                )
+
+                if left_wing:
+                    mesh[:nx, :ny, :] = inputs[mesh_name]
+                    # indices are numbered from tip to centerline
+                    #  reflection is all but midpoint in rev order
+                    mesh[:nx, ny:, :] = inputs[mesh_name][:, :-1, :][:, ::-1, :]
+                    mesh[:nx, ny:, 1] *= -1.0
+                else:
+                    mesh[:nx, ny - 1 :, :] = inputs[mesh_name]
+                    # indices are numbered from centerline to tip
+                    #  reflection is all points in rev order
+                    mesh[:nx, : ny - 1, :] = inputs[mesh_name][:, 1:, :][:, ::-1, :]
+                    mesh[:nx, : ny - 1, 1] *= -1.0
+
+                mu = inputs["mu"][0]
+                plane_normal = np.array([0.0, np.sin(mu), np.cos(mu)]).reshape(
+                    (1, 1, 3)
+                )
+                plane_point = np.zeros((1, 1, 3)) + plane_normal * inputs["height_agl"]
+
+                # reflect about the free surface
+                # plane is defined parallel to the free stream and height_agl from the origin 0 0 0
+                v = mesh[:nx, :, :] - plane_point
+                temp = np.inner(v, plane_normal).squeeze()[:, :, np.newaxis]
+                v_par = temp * plane_normal
+                mesh[nx:, :, :] = mesh[:nx, :, :] - 2 * v_par
+
+                outputs[vortex_mesh_name][: nx - 1, :, :] = (
+                    0.75 * mesh[: nx - 1, :, :] + 0.25 * mesh[1:nx, :, :]
+                )
+                outputs[vortex_mesh_name][nx - 1, :, :] = mesh[nx - 1, :, :]
+                outputs[vortex_mesh_name][nx:-1, :, :] = (
+                    0.75 * mesh[nx:-1, :, :] + 0.25 * mesh[nx + 1 :, :, :]
+                )
+                outputs[vortex_mesh_name][-1, :, :] = mesh[-1, :, :]
+
+                # plt.plot(mesh[:nx, -1, 0], mesh[:nx, -1, 2])
+                # plt.plot(mesh[nx:, -1, 0], mesh[nx:, -1, 2])
+                # plt.show()
+
+                # print("real:", mesh[:nx, :, :])
+                # print("ghost:", mesh[nx:, :, :])
+
+                # plt.plot(mesh[0, :, 1], mesh[0, :, 2])
+                # plt.plot(mesh[nx, :, 1], mesh[nx, :, 2])
+                # plt.show()
+
+                # plt.plot(mesh[:nx, 0, 0], mesh[:nx, 0, 2])
+                # plt.plot(mesh[nx:, 0, 0], mesh[nx:, 0, 2])
+                # plt.show()
+
+                # print("mu", mu)
+                # print("h", inputs["height_agl"])
+                # print("real:", mesh[0, :, 2])
+                # print("ghost:", mesh[nx, :, 2])
+
+            else:
                 if surface["symmetry"]:
-                    mesh = np.zeros((nx, ny * 2 - 1, 3), dtype=type(inputs[mesh_name][0, 0, 0]))
+                    mesh = np.zeros(
+                        (nx, ny * 2 - 1, 3), dtype=type(inputs[mesh_name][0, 0, 0])
+                    )
                     # Check if the wing is a left or right wing.
                     # Regardless, the "y" node ordering must always go from left to right
                     # for the aic matrix procedure to work correctly
@@ -240,40 +486,10 @@ class VortexMesh(om.ExplicitComponent):
                     mesh = inputs[mesh_name]
 
                 # all but the last station are moved to the quarterchord point
-                outputs[vortex_mesh_name][:-1, :, :] = 0.75 * mesh[:-1, :, :] + 0.25 * mesh[1:, :, :]
+                outputs[vortex_mesh_name][:-1, :, :] = (
+                    0.75 * mesh[:-1, :, :] + 0.25 * mesh[1:, :, :]
+                )
                 # the last one is coincident
-                outputs[vortex_mesh_name][-1, :, :] = mesh[-1, :, :]
-            else:
-                # symmetric in y plus ground plane using the first dimension
-                mesh = np.zeros((2 * nx, ny * 2 - 1, 3), dtype=type(inputs[mesh_name][0, 0, 0]))
-
-                if left_wing:
-                    mesh[:nx, :ny, :] = inputs[mesh_name]
-                    # indices are numbered from tip to centerline
-                    #  reflection is all but midpoint in rev order
-                    mesh[:nx, ny:, :] = inputs[mesh_name][:, :-1, :][:, ::-1, :]
-                    mesh[:nx, ny:, 1] *= -1.0
-                else:
-                    mesh[:nx, ny - 1 :, :] = inputs[mesh_name]
-                    # indices are numbered from centerline to tip
-                    #  reflection is all points in rev order
-                    mesh[:nx, : ny - 1, :] = inputs[mesh_name][:, 1:, :][:, ::-1, :]
-                    mesh[:nx, : ny - 1, 1] *= -1.0
-
-                alpha = inputs["alpha"][0]
-                plane_normal = np.array([np.sin(alpha), 0.0, -np.cos(alpha)]).reshape((1, 1, 3))
-                plane_point = np.zeros((1, 1, 3)) + plane_normal * inputs["height_agl"]
-
-                # reflect about the ground plane
-                # plane is defined parallel to the free stream and height_agl from the origin 0 0 0
-                v = mesh[:nx, :, :] - plane_point
-                temp = np.inner(v, plane_normal).squeeze()[:, :, np.newaxis]
-                v_par = temp * plane_normal
-                mesh[nx:, :, :] = mesh[:nx, :, :] - 2 * v_par
-
-                outputs[vortex_mesh_name][: nx - 1, :, :] = 0.75 * mesh[: nx - 1, :, :] + 0.25 * mesh[1:nx, :, :]
-                outputs[vortex_mesh_name][nx - 1, :, :] = mesh[nx - 1, :, :]
-                outputs[vortex_mesh_name][nx:-1, :, :] = 0.75 * mesh[nx:-1, :, :] + 0.25 * mesh[nx + 1 :, :, :]
                 outputs[vortex_mesh_name][-1, :, :] = mesh[-1, :, :]
 
     def compute_partials(self, inputs, J):
@@ -284,14 +500,11 @@ class VortexMesh(om.ExplicitComponent):
             ny = mesh.shape[1]
             name = surface["name"]
             ground_effect = surface.get("groundplane", False)
+            freesurface_effect = surface.get("freesurface", False)
 
             mesh_name = "{}_def_mesh".format(name)
             vortex_mesh_name = "{}_vortex_mesh".format(name)
-            if not ground_effect:
-                # if ground effect is not enabled the derivatives are constant
-                # and this method need nto be called
-                pass
-            else:
+            if ground_effect:
                 data = self._cached_constant_partial_vals[name]
                 # we've already figured out the partials for quadrants 1 and 2
                 # quandrants 3 and 4 are the ground plane reflections which
@@ -332,7 +545,6 @@ class VortexMesh(om.ExplicitComponent):
                 )
 
                 # now quadrant 4 with different dims and reflected y coords
-
                 data = np.concatenate(
                     [
                         data,
@@ -360,3 +572,11 @@ class VortexMesh(om.ExplicitComponent):
                 )
 
                 J[vortex_mesh_name, mesh_name] = data
+
+            elif freesurface_effect:
+                pass
+
+            else:
+                # if ground (resp. free-surface) effect is not enabled, the derivatives are constant
+                # and this method need not be called
+                pass

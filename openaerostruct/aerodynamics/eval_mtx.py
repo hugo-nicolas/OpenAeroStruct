@@ -120,7 +120,7 @@ class EvalVelMtx(om.ExplicitComponent):
     other panel, which results in rather large arrays for the
     intermediate calculations. Accordingly, the derivatives are complicated.
 
-    The actual calcuations done here vary a fair bit in the case of symmetry.
+    The actual calculations done here vary a fair bit in the case of symmetry.
     Not because the physics change, but because we need to account for a
     "ghost" version of the lifting surface, where we want to add the effects
     from the panels across the symmetry plane, but we don't want to actually
@@ -129,10 +129,11 @@ class EvalVelMtx(om.ExplicitComponent):
     This basically results in us looping through more calculations as if the
     panels were actually there.
 
-    The calculations also vary when we consider ground effect.
+    The calculations also vary when we consider ground (resp. free-surface) effect.
     This is accomplished by mirroring a second copy of the mesh across
-    the ground plane. The documentation has more detailed explanations.
-    The ground effect is only implemented for symmetric wings.
+    the ground plane (resp. the free surface). The documentation has more detailed
+    explanations. The ground (resp. free-surface) effect is only implemented for 
+    symmetric wings.
 
     Parameters
     ----------
@@ -174,6 +175,7 @@ class EvalVelMtx(om.ExplicitComponent):
             name = surface["name"]
 
             ground_effect = surface.get("groundplane", False)
+            freesurface_effect = surface.get("freesurface", False)
 
             # Get the names for the vectors and vel_mtx. We have the lifting
             # surface name coming in here, as well as the eval_name.
@@ -184,7 +186,7 @@ class EvalVelMtx(om.ExplicitComponent):
 
             # The logic differs if the surface is symmetric or not, due to the
             # existence of the "ghost" surface; the reflection of the actual.
-            if ground_effect:
+            if ground_effect or freesurface_effect:
                 nx_actual = 2 * nx
             else:
                 nx_actual = nx
@@ -212,7 +214,7 @@ class EvalVelMtx(om.ExplicitComponent):
             aic_base = np.einsum("ijkl,m->ijklm", vel_mtx_indices, np.ones(3, int))
             aic_len = np.sum(np.product(aic_base.shape))
 
-            if ground_effect:
+            if ground_effect or freesurface_effect:
                 # mirrored surface along the x mesh direction
                 surfaces_to_compute = [vectors_indices[:, :nx, :], vectors_indices[:, nx:, :]]
             else:
@@ -311,6 +313,7 @@ class EvalVelMtx(om.ExplicitComponent):
             ny = surface["mesh"].shape[1]
             name = surface["name"]
             ground_effect = surface.get("groundplane", False)
+            freesurface_effect = surface.get("freesurface", False)
 
             alpha = inputs["alpha"][0]
             cosa = np.cos(alpha * np.pi / 180.0)
@@ -336,6 +339,11 @@ class EvalVelMtx(om.ExplicitComponent):
                 # mirrored surface along the x mesh direction
                 surfaces_to_compute = [inputs[vectors_name][:, :nx, :, :], inputs[vectors_name][:, nx:, :, :]]
                 vortex_mults = [1.0, -1.0]
+            elif freesurface_effect:
+                # mirrored surface along the x mesh direction
+                surfaces_to_compute = [inputs[vectors_name][:, :nx, :, :], inputs[vectors_name][:, nx:, :, :]]
+                # the free surface is equivalent to an antisymmetry condition
+                vortex_mults = [1.0, 1.0]
             else:
                 surfaces_to_compute = [inputs[vectors_name]]
                 vortex_mults = [1.0]
@@ -406,6 +414,7 @@ class EvalVelMtx(om.ExplicitComponent):
             ny = surface["mesh"].shape[1]
             name = surface["name"]
             ground_effect = surface.get("groundplane", False)
+            freesurface_effect = surface.get("freesurface", False)
 
             vectors_name = "{}_{}_vectors".format(name, eval_name)
             vel_mtx_name = "{}_{}_vel_mtx".format(name, eval_name)
@@ -418,6 +427,11 @@ class EvalVelMtx(om.ExplicitComponent):
                 # mirrored surface along the x mesh direction
                 surfaces_to_compute = [inputs[vectors_name][:, :nx, :, :], inputs[vectors_name][:, nx:, :, :]]
                 vortex_mults = [1.0, -1.0]
+            elif freesurface_effect:
+                # mirrored surface along the x mesh direction
+                surfaces_to_compute = [inputs[vectors_name][:, :nx, :, :], inputs[vectors_name][:, nx:, :, :]]
+                # the free surface is equivalent to an antisymmetry condition
+                vortex_mults = [1.0, 1.0]
             else:
                 surfaces_to_compute = [inputs[vectors_name]]
                 vortex_mults = [1.0]
