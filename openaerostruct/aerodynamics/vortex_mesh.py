@@ -57,9 +57,7 @@ class VortexMesh(om.ExplicitComponent):
             mesh_name = "{}_def_mesh".format(name)
             vortex_mesh_name = "{}_vortex_mesh".format(name)
 
-            self.add_input(
-                mesh_name, shape=(nx, ny, 3), units="m", tags=["mphys_coupling"]
-            )
+            self.add_input(mesh_name, shape=(nx, ny, 3), units="m", tags=["mphys_coupling"])
 
             ground_effect = surface.get("groundplane", False)
             freesurface_effect = surface.get("freesurface", False)
@@ -92,18 +90,12 @@ class VortexMesh(om.ExplicitComponent):
                     self.declare_partials("*", "*", method="cs")
 
             if surface["symmetry"]:
-                left_wing = abs(surface["mesh"][0, 0, 1]) > abs(
-                    surface["mesh"][0, -1, 1]
-                )
+                left_wing = abs(surface["mesh"][0, 0, 1]) > abs(surface["mesh"][0, -1, 1])
 
                 if ground_effect:
-                    self.add_output(
-                        vortex_mesh_name, shape=(2 * nx, ny * 2 - 1, 3), units="m"
-                    )
+                    self.add_output(vortex_mesh_name, shape=(2 * nx, ny * 2 - 1, 3), units="m")
                     # these are cheaper to just do with CS
-                    self.declare_partials(
-                        vortex_mesh_name, ["alpha", "height_agl"], method="cs"
-                    )
+                    self.declare_partials(vortex_mesh_name, ["alpha", "height_agl"], method="cs")
                     mesh_indices = np.arange(nx * ny * 3).reshape((nx, ny, 3))
                     vor_indices = np.arange(2 * nx * (2 * ny - 1) * 3).reshape(
                         (2 * nx, (2 * ny - 1), 3)
@@ -117,9 +109,7 @@ class VortexMesh(om.ExplicitComponent):
                     quadrant_4_indices = vor_indices[nx:, ny:, :]
 
                 elif freesurface_effect:
-                    self.add_output(
-                        vortex_mesh_name, shape=(2 * nx, ny * 2 - 1, 3), units="m"
-                    )
+                    self.add_output(vortex_mesh_name, shape=(2 * nx, ny * 2 - 1, 3), units="m")
                     mesh_indices = np.arange(nx * ny * 3).reshape((nx, ny, 3))
                     vor_indices = np.arange(2 * nx * (2 * ny - 1) * 3).reshape(
                         (2 * nx, (2 * ny - 1), 3)
@@ -134,13 +124,9 @@ class VortexMesh(om.ExplicitComponent):
 
                 else:
                     # no groundplane or free surface
-                    self.add_output(
-                        vortex_mesh_name, shape=(nx, ny * 2 - 1, 3), units="m"
-                    )
+                    self.add_output(vortex_mesh_name, shape=(nx, ny * 2 - 1, 3), units="m")
                     mesh_indices = np.arange(nx * ny * 3).reshape((nx, ny, 3))
-                    vor_indices = np.arange(nx * (2 * ny - 1) * 3).reshape(
-                        (nx, (2 * ny - 1), 3)
-                    )
+                    vor_indices = np.arange(nx * (2 * ny - 1) * 3).reshape((nx, (2 * ny - 1), 3))
                     if not left_wing:
                         vor_indices = vor_indices[:, ::-1, :]
                         mesh_indices = mesh_indices[:, ::-1, :]
@@ -169,9 +155,7 @@ class VortexMesh(om.ExplicitComponent):
                 # quadrant 2 is the reflection of the baseline across the midline
                 # need to build these piecewise xyz because of the midline reflection
                 for dim3 in range(3):
-                    rows = np.hstack(
-                        (rows, np.tile(quadrant_2_indices[:-1, :, dim3].flatten(), 2))
-                    )
+                    rows = np.hstack((rows, np.tile(quadrant_2_indices[:-1, :, dim3].flatten(), 2)))
                     rows = np.hstack((rows, quadrant_2_indices[-1, :, dim3].flatten()))
                     cols = np.concatenate(
                         [
@@ -209,14 +193,10 @@ class VortexMesh(om.ExplicitComponent):
                         rows = np.hstack(
                             (
                                 rows,
-                                np.tile(
-                                    quadrant_3_indices[:-1, :, dep_of].flatten(), 2
-                                ),
+                                np.tile(quadrant_3_indices[:-1, :, dep_of].flatten(), 2),
                             )
                         )
-                        rows = np.hstack(
-                            (rows, quadrant_3_indices[-1, :, dep_of].flatten())
-                        )
+                        rows = np.hstack((rows, quadrant_3_indices[-1, :, dep_of].flatten()))
                         cols = np.concatenate(
                             [
                                 cols,
@@ -231,14 +211,10 @@ class VortexMesh(om.ExplicitComponent):
                         rows = np.hstack(
                             (
                                 rows,
-                                np.tile(
-                                    quadrant_4_indices[:-1, :, dep_of].flatten(), 2
-                                ),
+                                np.tile(quadrant_4_indices[:-1, :, dep_of].flatten(), 2),
                             )
                         )
-                        rows = np.hstack(
-                            (rows, quadrant_4_indices[-1, :, dep_of].flatten())
-                        )
+                        rows = np.hstack((rows, quadrant_4_indices[-1, :, dep_of].flatten()))
                         cols = np.concatenate(
                             [
                                 cols,
@@ -249,9 +225,7 @@ class VortexMesh(om.ExplicitComponent):
                         )
 
                     # can't declare constant partials because these depend on alpha (and h?)
-                    self.declare_partials(
-                        vortex_mesh_name, mesh_name, rows=rows, cols=cols
-                    )
+                    self.declare_partials(vortex_mesh_name, mesh_name, rows=rows, cols=cols)
                     self._cached_constant_partial_vals[name] = data.copy()
 
                 elif freesurface_effect:
@@ -265,14 +239,10 @@ class VortexMesh(om.ExplicitComponent):
                         rows = np.hstack(
                             (
                                 rows,
-                                np.tile(
-                                    quadrant_3_indices[:-1, :, dep_of].flatten(), 2
-                                ),
+                                np.tile(quadrant_3_indices[:-1, :, dep_of].flatten(), 2),
                             )
                         )
-                        rows = np.hstack(
-                            (rows, quadrant_3_indices[-1, :, dep_of].flatten())
-                        )
+                        rows = np.hstack((rows, quadrant_3_indices[-1, :, dep_of].flatten()))
                         cols = np.concatenate(
                             [
                                 cols,
@@ -287,14 +257,10 @@ class VortexMesh(om.ExplicitComponent):
                         rows = np.hstack(
                             (
                                 rows,
-                                np.tile(
-                                    quadrant_4_indices[:-1, :, dep_of].flatten(), 2
-                                ),
+                                np.tile(quadrant_4_indices[:-1, :, dep_of].flatten(), 2),
                             )
                         )
-                        rows = np.hstack(
-                            (rows, quadrant_4_indices[-1, :, dep_of].flatten())
-                        )
+                        rows = np.hstack((rows, quadrant_4_indices[-1, :, dep_of].flatten()))
                         cols = np.concatenate(
                             [
                                 cols,
@@ -312,9 +278,7 @@ class VortexMesh(om.ExplicitComponent):
 
             else:
                 if ground_effect:
-                    raise ValueError(
-                        "Ground effect is not supported without symmetry turned on"
-                    )
+                    raise ValueError("Ground effect is not supported without symmetry turned on")
                 elif freesurface_effect:
                     raise ValueError(
                         "Free-surface effect is not supported without symmetry turned on"
@@ -342,9 +306,7 @@ class VortexMesh(om.ExplicitComponent):
                     ]
                 )
 
-                self.declare_partials(
-                    vortex_mesh_name, mesh_name, val=data, rows=rows, cols=cols
-                )
+                self.declare_partials(vortex_mesh_name, mesh_name, val=data, rows=rows, cols=cols)
 
     def compute(self, inputs, outputs):
         surfaces = self.options["surfaces"]
@@ -362,9 +324,7 @@ class VortexMesh(om.ExplicitComponent):
 
             if ground_effect:
                 # symmetric in y plus ground plane using the first dimension
-                mesh = np.zeros(
-                    (2 * nx, ny * 2 - 1, 3), dtype=type(inputs[mesh_name][0, 0, 0])
-                )
+                mesh = np.zeros((2 * nx, ny * 2 - 1, 3), dtype=type(inputs[mesh_name][0, 0, 0]))
 
                 if left_wing:
                     mesh[:nx, :ny, :] = inputs[mesh_name]
@@ -380,9 +340,7 @@ class VortexMesh(om.ExplicitComponent):
                     mesh[:nx, : ny - 1, 1] *= -1.0
 
                 alpha = inputs["alpha"][0]
-                plane_normal = np.array([np.sin(alpha), 0.0, -np.cos(alpha)]).reshape(
-                    (1, 1, 3)
-                )
+                plane_normal = np.array([np.sin(alpha), 0.0, -np.cos(alpha)]).reshape((1, 1, 3))
                 plane_point = np.zeros((1, 1, 3)) + plane_normal * inputs["height_agl"]
 
                 # reflect about the ground plane
@@ -403,9 +361,7 @@ class VortexMesh(om.ExplicitComponent):
 
             elif freesurface_effect:
                 # symmetric in y plus ground plane using the first dimension
-                mesh = np.zeros(
-                    (2 * nx, ny * 2 - 1, 3), dtype=type(inputs[mesh_name][0, 0, 0])
-                )
+                mesh = np.zeros((2 * nx, ny * 2 - 1, 3), dtype=type(inputs[mesh_name][0, 0, 0]))
 
                 if left_wing:
                     mesh[:nx, :ny, :] = inputs[mesh_name]
@@ -421,9 +377,7 @@ class VortexMesh(om.ExplicitComponent):
                     mesh[:nx, : ny - 1, 1] *= -1.0
 
                 mu = inputs["mu"][0]
-                plane_normal = np.array([0.0, np.sin(mu), np.cos(mu)]).reshape(
-                    (1, 1, 3)
-                )
+                plane_normal = np.array([0.0, np.sin(mu), np.cos(mu)]).reshape((1, 1, 3))
                 plane_point = np.zeros((1, 1, 3)) + plane_normal * inputs["height_agl"]
 
                 # reflect about the free surface
@@ -464,9 +418,7 @@ class VortexMesh(om.ExplicitComponent):
 
             else:
                 if surface["symmetry"]:
-                    mesh = np.zeros(
-                        (nx, ny * 2 - 1, 3), dtype=type(inputs[mesh_name][0, 0, 0])
-                    )
+                    mesh = np.zeros((nx, ny * 2 - 1, 3), dtype=type(inputs[mesh_name][0, 0, 0]))
                     # Check if the wing is a left or right wing.
                     # Regardless, the "y" node ordering must always go from left to right
                     # for the aic matrix procedure to work correctly

@@ -14,6 +14,7 @@ from openaerostruct.geometry.geometry_mesh_transformations import (
     Dihedral,
     ShearZ,
     Rotate,
+    FlapAngle,
 )
 
 
@@ -78,7 +79,9 @@ class GeometryMesh(om.Group):
             promotes = []
 
         self.add_subsystem(
-            "taper", Taper(val=val, mesh=mesh, symmetry=symmetry, ref_axis_pos=ref_axis_pos), promotes_inputs=promotes
+            "taper",
+            Taper(val=val, mesh=mesh, symmetry=symmetry, ref_axis_pos=ref_axis_pos),
+            promotes_inputs=promotes,
         )
 
         # 2. Scale X
@@ -104,7 +107,11 @@ class GeometryMesh(om.Group):
             val = 0.0
             promotes = []
 
-        self.add_subsystem("sweep", Sweep(val=val, mesh_shape=mesh_shape, symmetry=symmetry), promotes_inputs=promotes)
+        self.add_subsystem(
+            "sweep",
+            Sweep(val=val, mesh_shape=mesh_shape, symmetry=symmetry),
+            promotes_inputs=promotes,
+        )
 
         # 4. Shear X
 
@@ -114,7 +121,9 @@ class GeometryMesh(om.Group):
         else:
             promotes = []
 
-        self.add_subsystem("shear_x", ShearX(val=val, mesh_shape=mesh_shape), promotes_inputs=promotes)
+        self.add_subsystem(
+            "shear_x", ShearX(val=val, mesh_shape=mesh_shape), promotes_inputs=promotes
+        )
 
         # 5. Stretch
 
@@ -144,7 +153,9 @@ class GeometryMesh(om.Group):
         else:
             promotes = []
 
-        self.add_subsystem("shear_y", ShearY(val=val, mesh_shape=mesh_shape), promotes_inputs=promotes)
+        self.add_subsystem(
+            "shear_y", ShearY(val=val, mesh_shape=mesh_shape), promotes_inputs=promotes
+        )
 
         # 7. Dihedral
 
@@ -156,7 +167,9 @@ class GeometryMesh(om.Group):
             promotes = []
 
         self.add_subsystem(
-            "dihedral", Dihedral(val=val, mesh_shape=mesh_shape, symmetry=symmetry), promotes_inputs=promotes
+            "dihedral",
+            Dihedral(val=val, mesh_shape=mesh_shape, symmetry=symmetry),
+            promotes_inputs=promotes,
         )
 
         # 8. Shear Z
@@ -167,7 +180,9 @@ class GeometryMesh(om.Group):
         else:
             promotes = []
 
-        self.add_subsystem("shear_z", ShearZ(val=val, mesh_shape=mesh_shape), promotes_inputs=promotes)
+        self.add_subsystem(
+            "shear_z", ShearZ(val=val, mesh_shape=mesh_shape), promotes_inputs=promotes
+        )
 
         # 9. Rotate
 
@@ -182,10 +197,37 @@ class GeometryMesh(om.Group):
             "rotate",
             Rotate(val=val, mesh_shape=mesh_shape, symmetry=symmetry, ref_axis_pos=ref_axis_pos),
             promotes_inputs=promotes,
+            # promotes_outputs=["mesh"],
+        )
+
+        # 10. Flap angle
+
+        if "flap_angle" in surface:
+            val = surface["flap_angle"]
+            promotes = ["flap_angle"]
+        else:
+            val = 0.0
+            promotes = []
+
+        self.add_subsystem(
+            "flap_angle",
+            FlapAngle(val=val, mesh_shape=mesh_shape, symmetry=symmetry),
+            promotes_inputs=promotes,
             promotes_outputs=["mesh"],
         )
 
-        names = ["taper", "scale_x", "sweep", "shear_x", "stretch", "shear_y", "dihedral", "shear_z", "rotate"]
+        names = [
+            "taper",
+            "scale_x",
+            "sweep",
+            "shear_x",
+            "stretch",
+            "shear_y",
+            "dihedral",
+            "shear_z",
+            "rotate",
+            "flap_angle",
+        ]
 
         for j in np.arange(len(names) - 1):
             self.connect(names[j] + ".mesh", names[j + 1] + ".in_mesh")

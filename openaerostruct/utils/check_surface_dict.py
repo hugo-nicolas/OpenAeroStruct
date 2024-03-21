@@ -23,6 +23,7 @@ def check_surface_dict_keys(surface):
         "taper",
         "sweep",
         "dihedral",
+        "flap_angle",
         "twist_cp",
         "chord_cp",
         "xshear_cp",

@@ -34,7 +34,9 @@ class Geometry(om.Group):
         if self.options["DVGeo"]:
             from openaerostruct.geometry.ffd_component import GeometryMesh
 
-            self.set_input_defaults("shape", val=np.zeros((surface["mx"], surface["my"])), units="m")
+            self.set_input_defaults(
+                "shape", val=np.zeros((surface["mx"], surface["my"])), units="m"
+            )
 
             if "t_over_c_cp" in surface.keys():
                 n_cp = len(surface["t_over_c_cp"])
@@ -43,7 +45,10 @@ class Geometry(om.Group):
                 comp = self.add_subsystem(
                     "t_over_c_bsp",
                     om.SplineComp(
-                        method="bsplines", x_interp_val=x_interp, num_cp=n_cp, interp_options={"order": min(n_cp, 4)}
+                        method="bsplines",
+                        x_interp_val=x_interp,
+                        num_cp=n_cp,
+                        interp_options={"order": min(n_cp, 4)},
                     ),
                     promotes_inputs=["t_over_c_cp"],
                     promotes_outputs=["t_over_c"],
@@ -71,7 +76,10 @@ class Geometry(om.Group):
                 comp = self.add_subsystem(
                     "twist_bsp",
                     om.SplineComp(
-                        method="bsplines", x_interp_val=x_interp, num_cp=n_cp, interp_options={"order": min(n_cp, 4)}
+                        method="bsplines",
+                        x_interp_val=x_interp,
+                        num_cp=n_cp,
+                        interp_options={"order": min(n_cp, 4)},
                     ),
                     promotes_inputs=["twist_cp"],
                     promotes_outputs=["twist"],
@@ -90,7 +98,10 @@ class Geometry(om.Group):
                 comp = self.add_subsystem(
                     "chord_bsp",
                     om.SplineComp(
-                        method="bsplines", x_interp_val=x_interp, num_cp=n_cp, interp_options={"order": min(n_cp, 4)}
+                        method="bsplines",
+                        x_interp_val=x_interp,
+                        num_cp=n_cp,
+                        interp_options={"order": min(n_cp, 4)},
                     ),
                     promotes_inputs=["chord_cp"],
                     promotes_outputs=["chord"],
@@ -107,7 +118,10 @@ class Geometry(om.Group):
                 comp = self.add_subsystem(
                     "t_over_c_bsp",
                     om.SplineComp(
-                        method="bsplines", x_interp_val=x_interp, num_cp=n_cp, interp_options={"order": min(n_cp, 4)}
+                        method="bsplines",
+                        x_interp_val=x_interp,
+                        num_cp=n_cp,
+                        interp_options={"order": min(n_cp, 4)},
                     ),
                     promotes_inputs=["t_over_c_cp"],
                     promotes_outputs=["t_over_c"],
@@ -123,7 +137,10 @@ class Geometry(om.Group):
                 comp = self.add_subsystem(
                     "xshear_bsp",
                     om.SplineComp(
-                        method="bsplines", x_interp_val=x_interp, num_cp=n_cp, interp_options={"order": min(n_cp, 4)}
+                        method="bsplines",
+                        x_interp_val=x_interp,
+                        num_cp=n_cp,
+                        interp_options={"order": min(n_cp, 4)},
                     ),
                     promotes_inputs=["xshear_cp"],
                     promotes_outputs=["xshear"],
@@ -140,7 +157,10 @@ class Geometry(om.Group):
                 comp = self.add_subsystem(
                     "yshear_bsp",
                     om.SplineComp(
-                        method="bsplines", x_interp_val=x_interp, num_cp=n_cp, interp_options={"order": min(n_cp, 4)}
+                        method="bsplines",
+                        x_interp_val=x_interp,
+                        num_cp=n_cp,
+                        interp_options={"order": min(n_cp, 4)},
                     ),
                     promotes_inputs=["yshear_cp"],
                     promotes_outputs=["yshear"],
@@ -157,7 +177,10 @@ class Geometry(om.Group):
                 comp = self.add_subsystem(
                     "zshear_bsp",
                     om.SplineComp(
-                        method="bsplines", x_interp_val=x_interp, num_cp=n_cp, interp_options={"order": min(n_cp, 4)}
+                        method="bsplines",
+                        x_interp_val=x_interp,
+                        num_cp=n_cp,
+                        interp_options={"order": min(n_cp, 4)},
                     ),
                     promotes_inputs=["zshear_cp"],
                     promotes_outputs=["zshear"],
@@ -187,6 +210,14 @@ class Geometry(om.Group):
                 if surface.get("taper_dv", True):
                     self.set_input_defaults("taper", val=surface["taper"])
 
+            if "flap_angle" in surface.keys():
+                bsp_inputs.append("flap_angle")
+                if surface.get("flap_angle_dv", True):
+                    self.set_input_defaults("flap_angle", val=surface["flap_angle"], units="rad")
+
             self.add_subsystem(
-                "mesh", GeometryMesh(surface=surface), promotes_inputs=bsp_inputs, promotes_outputs=["mesh"]
+                "mesh",
+                GeometryMesh(surface=surface),
+                promotes_inputs=bsp_inputs,
+                promotes_outputs=["mesh"],
             )

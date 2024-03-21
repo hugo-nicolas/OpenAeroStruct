@@ -29,7 +29,9 @@ class Taper(om.ExplicitComponent):
         self.options.declare("val", desc="Initial value for the taper ratio.")
         self.options.declare("mesh", desc="Nodal mesh defining the initial aerodynamic surface.")
         self.options.declare(
-            "symmetry", default=False, desc="Flag set to true if surface is reflected about y=0 plane."
+            "symmetry",
+            default=False,
+            desc="Flag set to true if surface is reflected about y=0 plane.",
         )
         self.options.declare(
             "ref_axis_pos",
@@ -232,7 +234,9 @@ class Sweep(om.ExplicitComponent):
         self.options.declare("val", desc="Initial value for x shear.")
         self.options.declare("mesh_shape", desc="Tuple containing mesh shape (nx, ny).")
         self.options.declare(
-            "symmetry", default=False, desc="Flag set to true if surface is reflected about y=0 plane."
+            "symmetry",
+            default=False,
+            desc="Flag set to true if surface is reflected about y=0 plane.",
         )
 
     def setup(self):
@@ -429,7 +433,9 @@ class Stretch(om.ExplicitComponent):
         self.options.declare("val", desc="Initial value for span.")
         self.options.declare("mesh_shape", desc="Tuple containing mesh shape (nx, ny).")
         self.options.declare(
-            "symmetry", default=False, desc="Flag set to true if surface is reflected about y=0 plane."
+            "symmetry",
+            default=False,
+            desc="Flag set to true if surface is reflected about y=0 plane.",
         )
         self.options.declare(
             "ref_axis_pos",
@@ -465,7 +471,9 @@ class Stretch(om.ExplicitComponent):
         i_te1 = nn * 3 - 2
 
         rows_4c = np.tile(3 * np.arange(nn) + 1, 4)
-        cols_4c = np.concatenate([np.tile(i_le0, nn), np.tile(i_le1, nn), np.tile(i_te0, nn), np.tile(i_te1, nn)])
+        cols_4c = np.concatenate(
+            [np.tile(i_le0, nn), np.tile(i_le1, nn), np.tile(i_te0, nn), np.tile(i_te1, nn)]
+        )
 
         # Diagonal stripes
         base = 3 * np.arange(1, ny - 1) + 1
@@ -545,9 +553,13 @@ class Stretch(om.ExplicitComponent):
             (1 - self.ref_axis_pos) * span * (d_prev_span + d_prev_span_qc1), nx
         )
         nn4 = nn3 + nn2
-        partials["mesh", "in_mesh"][nn3:nn4] = np.tile(-self.ref_axis_pos * span * (d_prev_span - d_prev_span_qc0), nx)
+        partials["mesh", "in_mesh"][nn3:nn4] = np.tile(
+            -self.ref_axis_pos * span * (d_prev_span - d_prev_span_qc0), nx
+        )
         nn5 = nn4 + nn2
-        partials["mesh", "in_mesh"][nn4:nn5] = np.tile(self.ref_axis_pos * span * (d_prev_span + d_prev_span_qc1), nx)
+        partials["mesh", "in_mesh"][nn4:nn5] = np.tile(
+            self.ref_axis_pos * span * (d_prev_span + d_prev_span_qc1), nx
+        )
 
         nn6 = nn5 + nx * (ny - 2)
         partials["mesh", "in_mesh"][nn5:nn6] = (1 - self.ref_axis_pos) * span / prev_span
@@ -635,7 +647,9 @@ class Dihedral(om.ExplicitComponent):
         self.options.declare("val", desc="Initial value for dihedral.")
         self.options.declare("mesh_shape", desc="Tuple containing mesh shape (nx, ny).")
         self.options.declare(
-            "symmetry", default=False, desc="Flag set to true if surface is reflected about y=0 plane."
+            "symmetry",
+            default=False,
+            desc="Flag set to true if surface is reflected about y=0 plane.",
         )
 
     def setup(self):
@@ -660,7 +674,9 @@ class Dihedral(om.ExplicitComponent):
         if self.options["symmetry"]:
             y_cp = ny * 3 - 2
             te_cols = np.tile(y_cp, nx * (ny - 1))
-            te_rows = np.tile(3 * np.arange(ny - 1) + 2, nx) + np.repeat(3 * ny * np.arange(nx), ny - 1)
+            te_rows = np.tile(3 * np.arange(ny - 1) + 2, nx) + np.repeat(
+                3 * ny * np.arange(nx), ny - 1
+            )
             se_cols = np.tile(3 * np.arange(ny - 1) + 1, nx)
         else:
             y_cp = 3 * (ny + 1) // 2 - 2
@@ -829,10 +845,12 @@ class Rotate(om.ExplicitComponent):
         """
         Declare options.
         """
-        self.options.declare("val", desc="Initial value for dihedral.")
+        self.options.declare("val", desc="Initial value for twist.")
         self.options.declare("mesh_shape", desc="Tuple containing mesh shape (nx, ny).")
         self.options.declare(
-            "symmetry", default=False, desc="Flag set to true if surface is reflected about y=0 plane."
+            "symmetry",
+            default=False,
+            desc="Flag set to true if surface is reflected about y=0 plane.",
         )
         self.options.declare(
             "rotate_x",
@@ -913,8 +931,12 @@ class Rotate(om.ExplicitComponent):
             le_od_col2 = np.tile(col_base_y2, nx)
             te_od_col2 = le_od_col2 + 3 * ny * (nx - 1)
 
-            rows = np.concatenate([dg_row, le_dg_row, te_dg_row, te_od_row1, te_od_row2, te_od_row1, te_od_row2])
-            cols = np.concatenate([dg_col, le_dg_col, te_dg_col, le_od_col1, le_od_col2, te_od_col1, te_od_col2])
+            rows = np.concatenate(
+                [dg_row, le_dg_row, te_dg_row, te_od_row1, te_od_row2, te_od_row1, te_od_row2]
+            )
+            cols = np.concatenate(
+                [dg_col, le_dg_col, te_dg_col, le_od_col1, le_od_col2, te_od_col1, te_od_col2]
+            )
 
         self.declare_partials("mesh", "in_mesh", rows=rows, cols=cols)
 
@@ -1120,3 +1142,88 @@ class Rotate(om.ExplicitComponent):
                 partials["mesh", "in_mesh"][nn5:nn6] = -self.ref_axis_pos * d_dq_flat1
                 nn7 = nn6 + del_n
                 partials["mesh", "in_mesh"][nn6:nn7] = -self.ref_axis_pos * d_dq_flat2
+
+
+class FlapAngle(om.ExplicitComponent):
+    """
+    OpenMDAO component that manipulates the mesh by applying flap angle. Positive angles down.
+
+    Parameters
+    ----------
+    mesh[nx, ny, 3] : numpy array
+        Nodal mesh defining the initial aerodynamic surface.
+    flap_angle : float
+        Flap angle in degrees.
+    symmetry : boolean
+        Flag set to true if surface is reflected about y=0 plane.
+
+    Returns
+    -------
+    mesh[nx, ny, 3] : numpy array
+        Nodal mesh defining the aerodynamic surface with flap angle.
+    """
+
+    def initialize(self):
+        """
+        Declare options.
+        """
+        self.options.declare("val", desc="Initial value for flap angle.")
+        self.options.declare("mesh_shape", desc="Tuple containing mesh shape (nx, ny).")
+        self.options.declare(
+            "symmetry",
+            default=False,
+            desc="Flag set to true if surface is reflected about y=0 plane.",
+        )
+        self.options.declare(
+            "rotate_x",
+            default=True,
+            desc="Flag set to True if the user desires the twist variable to "
+            "always be applied perpendicular to the wing (say, in the case of "
+            "a winglet).",
+        )
+
+    def setup(self):
+        mesh_shape = self.mesh_shape = self.options["mesh_shape"]
+        val = self.options["val"]
+
+        self.add_input("flap_angle", val=val, units="rad")
+        self.add_input("in_mesh", shape=mesh_shape, units="m")
+
+        self.add_output("mesh", shape=mesh_shape, units="m")
+
+    def setup_partials(self):
+        self.declare_partials("*", "*", method="fd")
+
+    def compute(self, inputs, outputs):
+        symmetry = self.options["symmetry"]
+        rotate_x = self.options["rotate_x"]
+        mesh = inputs["in_mesh"]
+
+        flap_angle = inputs["flap_angle"][0]
+        # deg2rad = np.pi / 180.0
+        # flap_angle_rad = flap_angle * deg2rad
+        flap_angle_rad = flap_angle
+
+        if isinstance(flap_angle, complex):
+            input_array = np.zeros((3, 3), dtype=complex)
+        else:
+            input_array = np.zeros((3, 3))
+        TbE_theta = np.zeros_like(input_array)
+        TbE_theta[0, :] = [np.cos(flap_angle_rad), 0, np.sin(flap_angle_rad)]
+        TbE_theta[1, :] = [0, 1, 0]
+        TbE_theta[2, :] = [-np.sin(flap_angle_rad), 0, np.cos(flap_angle_rad)]
+
+        output_mesh = mesh.copy()
+
+        nx, ny, _ = self.mesh_shape
+        lhl = 6 * nx // 10
+        for i_nx in range(lhl, nx):
+            for i_ny in range(ny):
+                output_mesh[i_nx, i_ny, :] = mesh[lhl, i_ny, :] + TbE_theta @ (
+                    mesh[i_nx, i_ny, :] - mesh[lhl, i_ny, :]
+                )
+
+        outputs["mesh"] = output_mesh
+
+    def compute_partials(self, inputs, partials):
+        pass

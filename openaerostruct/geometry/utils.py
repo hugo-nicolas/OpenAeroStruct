@@ -1053,7 +1053,7 @@ def writeMesh(mesh, filename):
 def getFullMesh(left_mesh=None, right_mesh=None):
     """
     For a symmetric wing, OAS only keeps and does computation on the left half.
-    This script mirros the OAS mesh and attaches it to the existing mesh to
+    This script mirrors the OAS mesh and attaches it to the existing mesh to
     obtain the full mesh.
 
     Parameters
